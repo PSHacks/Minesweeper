@@ -84,11 +84,11 @@
     <div class="timer" id="timer">000</div>
   </div>
   <div class="difficulty">
-    <label>Сложность: 
+    <label>Difficulty:
       <select id="difficulty">
-        <option value="easy">Легко (9x9, 10 мин)</option>
-        <option value="medium" selected>Средне (16x16, 40 мин)</option>
-        <option value="hard">Сложно (30x16, 99 мин)</option>
+        <option value="easy">Easy (9x9, 10 mines)</option>
+        <option value="medium" selected>Medium (16x16, 40 mines)</option>
+        <option value="hard">Hard (30x16, 99 mines)</option>
       </select>
     </label>
   </div>
@@ -108,7 +108,7 @@
   let restartBtn = document.getElementById("restart");
   let difficultySelect = document.getElementById("difficulty");
 
-  let cells = [], timer = null, seconds = 0, gameOver = false, flagsUsed = 0;
+  let cells = [], timer = null, seconds = 0, gameOver = false, flagsUsed = 0, revealedCount = 0;
   let rows = 16, cols = 16, mineCount = 40;
 
   function startTimer() {
@@ -124,6 +124,7 @@
     timer = null;
     seconds = 0;
     flagsUsed = 0;
+    revealedCount = 0;
     timerDisplay.textContent = "000";
 
     const difficulty = difficultySelect.value;
@@ -135,6 +136,7 @@
     board.style.gridTemplateRows = `repeat(${rows}, 30px)`;
     cells = [];
     gameOver = false;
+    restartBtn.textContent = "😊";
     createBoard();
   }
 
@@ -194,16 +196,19 @@
       gameOver = true;
       restartBtn.textContent = "😵";
       revealAll();
+      alert("Game Over! 💥");
       return;
     }
 
     revealCell(cell);
+    checkWin();
   }
 
   function revealCell(cell) {
     if (cell.classList.contains("revealed")) return;
 
     cell.classList.add("revealed");
+    revealedCount++;
     const count = parseInt(cell.dataset.count);
     if (count > 0) {
       cell.textContent = count;
@@ -246,6 +251,15 @@
       } else {
         revealCell(cell);
       }
+    }
+  }
+
+  function checkWin() {
+    if (revealedCount === rows * cols - mineCount) {
+      gameOver = true;
+      clearInterval(timer);
+      restartBtn.textContent = "😎";
+      alert("You win! 🎉");
     }
   }
 
