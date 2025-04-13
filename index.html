@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Minesweeper Clone</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #ccc;
+      display: flex;
+      justify-content: center;
+      margin-top: 30px;
+    }
+    .game {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      background: #ddd;
+      padding: 10px;
+      border: 2px solid #888;
+    }
+    .top-bar {
+      display: flex;
+      justify-content: space-between;
+      width: 100%;
+      padding: 5px 10px;
+      background: #bbb;
+      margin-bottom: 10px;
+    }
+    .counter, .timer {
+      font-family: monospace;
+      font-size: 24px;
+      background: black;
+      color: red;
+      padding: 2px 8px;
+    }
+    .restart {
+      font-size: 20px;
+      cursor: pointer;
+      background: #eee;
+      border: 2px solid #999;
+      border-radius: 5px;
+    }
+    .difficulty {
+      margin-bottom: 10px;
+    }
+    .board {
+      display: grid;
+      gap: 2px;
+    }
+    .cell {
+      width: 30px;
+      height: 30px;
+      background: #bbb;
+      border: 1px solid #999;
+      text-align: center;
+      line-height: 30px;
+      font-weight: bold;
+      cursor: pointer;
+      user-select: none;
+    }
+    .revealed {
+      background: #e0e0e0;
+      cursor: default;
+    }
+    .mine {
+      background: red;
+      color: white;
+    }
+    .flagged {
+      background: #ff0;
+    }
+    .num1 { color: blue; }
+    .num2 { color: green; }
+    .num3 { color: red; }
+    .num4 { color: navy; }
+  </style>
+</head>
+<body>
+<div class="game">
+  <div class="top-bar">
+    <div class="counter" id="mine-counter">040</div>
+    <button class="restart" id="restart">😊</button>
+    <div class="timer" id="timer">000</div>
+  </div>
+  <div class="difficulty">
+    <label>Сложность: 
+      <select id="difficulty">
+        <option value="easy">Легко (9x9, 10 мин)</option>
+        <option value="medium" selected>Средне (16x16, 40 мин)</option>
+        <option value="hard">Сложно (30x16, 99 мин)</option>
+      </select>
+    </label>
+  </div>
+  <div class="board" id="board"></div>
+</div>
+
+<script>
+  const difficultySettings = {
+    easy: { rows: 9, cols: 9, mines: 10 },
+    medium: { rows: 16, cols: 16, mines: 40 },
+    hard: { rows: 16, cols: 30, mines: 99 },
+  };
+
+  let board = document.getElementById("board");
+  let mineCounter = document.getElementById("mine-counter");
+  let timerDisplay = document.getElementById("timer");
+  let restartBtn = document.getElementById("restart");
+  let difficultySelect = document.getElementById("difficulty");
+
+  let cells = [], timer = null, seconds = 0, gameOver = false, flagsUsed = 0;
+  let rows = 16, cols = 16, mineCount = 40;
+
+  function startTimer() {
+    if (timer) return;
+    timer = setInterval(() => {
+      seconds++;
+      timerDisplay.textContent = seconds.toString().padStart(3, '0');
+    }, 1000);
+  }
+
+  function resetGame() {
+    clearInterval(timer);
+    timer = null;
+    seconds = 0;
+    flagsUsed = 0;
+    timerDisplay.textContent = "000";
+
+    const difficulty = difficultySelect.value;
+    ({ rows, cols, mines: mineCount } = difficultySettings[difficulty]);
+
+    mineCounter.textContent = mineCount.toString().padStart(3, '0');
+    board.innerHTML = "";
+    board.style.gridTemplateColumns = `repeat(${cols}, 30px)`;
+    board.style.gridTemplateRows = `repeat(${rows}, 30px)`;
+    cells = [];
+    gameOver = false;
+    createBoard();
+  }
+
+  restartBtn.addEventListener("click", resetGame);
+  difficultySelect.addEventListener("change", resetGame);
+
+  function createBoard() {
+    const mines = new Set();
+    while (mines.size < mineCount) {
+      mines.add(Math.floor(Math.random() * rows * cols));
+    }
+
+    for (let i = 0; i < rows * cols; i++) {
+      const cell = document.createElement("div");
+      cell.classList.add("cell");
+      board.appendChild(cell);
+
+      const x = i % cols;
+      const y = Math.floor(i / cols);
+      cell.dataset.x = x;
+      cell.dataset.y = y;
+      cell.dataset.index = i;
+      cell.dataset.mine = mines.has(i);
+      cells.push(cell);
+
+      cell.addEventListener("click", () => handleClick(cell));
+      cell.addEventListener("contextmenu", (e) => {
+        e.preventDefault();
+        toggleFlag(cell);
+      });
+    }
+
+    for (const cell of cells) {
+      if (cell.dataset.mine === "true") continue;
+      const x = parseInt(cell.dataset.x);
+      const y = parseInt(cell.dataset.y);
+      let count = 0;
+      for (let dx = -1; dx <= 1; dx++) {
+        for (let dy = -1; dy <= 1; dy++) {
+          const nx = x + dx;
+          const ny = y + dy;
+          const neighbor = cells.find(c => parseInt(c.dataset.x) === nx && parseInt(c.dataset.y) === ny);
+          if (neighbor && neighbor.dataset.mine === "true") count++;
+        }
+      }
+      cell.dataset.count = count;
+    }
+  }
+
+  function handleClick(cell) {
+    if (gameOver || cell.classList.contains("revealed") || cell.classList.contains("flagged")) return;
+    startTimer();
+
+    if (cell.dataset.mine === "true") {
+      cell.classList.add("mine", "revealed");
+      cell.textContent = "💣";
+      gameOver = true;
+      restartBtn.textContent = "😵";
+      revealAll();
+      return;
+    }
+
+    revealCell(cell);
+  }
+
+  function revealCell(cell) {
+    if (cell.classList.contains("revealed")) return;
+
+    cell.classList.add("revealed");
+    const count = parseInt(cell.dataset.count);
+    if (count > 0) {
+      cell.textContent = count;
+      cell.classList.add("num" + count);
+    } else {
+      const x = parseInt(cell.dataset.x);
+      const y = parseInt(cell.dataset.y);
+      for (let dx = -1; dx <= 1; dx++) {
+        for (let dy = -1; dy <= 1; dy++) {
+          const nx = x + dx;
+          const ny = y + dy;
+          const neighbor = cells.find(c => parseInt(c.dataset.x) === nx && parseInt(c.dataset.y) === ny);
+          if (neighbor && !neighbor.classList.contains("revealed")) {
+            revealCell(neighbor);
+          }
+        }
+      }
+    }
+  }
+
+  function toggleFlag(cell) {
+    if (gameOver || cell.classList.contains("revealed")) return;
+    cell.classList.toggle("flagged");
+    if (cell.classList.contains("flagged")) {
+      cell.textContent = "🚩";
+      flagsUsed++;
+    } else {
+      cell.textContent = "";
+      flagsUsed--;
+    }
+    mineCounter.textContent = (mineCount - flagsUsed).toString().padStart(3, '0');
+  }
+
+  function revealAll() {
+    clearInterval(timer);
+    for (const cell of cells) {
+      if (cell.dataset.mine === "true") {
+        cell.classList.add("mine", "revealed");
+        cell.textContent = "💣";
+      } else {
+        revealCell(cell);
+      }
+    }
+  }
+
+  resetGame();
+</script>
+</body>
+</html>
